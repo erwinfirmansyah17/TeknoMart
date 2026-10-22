@@ -1,0 +1,10 @@
+{
+  "name": "teknomart-browser-tests",
+  "private": true,
+  "scripts": {
+    "test": "node smoke.cjs && node interactions.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

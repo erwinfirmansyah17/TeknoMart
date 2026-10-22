@@ -1,0 +1,45 @@
+const { chromium } = require('playwright');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+(async () => {
+  const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  for (const width of [1440, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 }, extraHTTPHeaders: { 'X-Test-Role': 'user', 'X-Test-Fixture': 'commerce' } });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('http://127.0.0.1:8765/', { waitUntil: 'networkidle' });
+    assert.equal((await page.locator('.store-brand-row').innerText()).trim(), 'TeknoMart');
+    assert.equal(await page.locator('.store-logo').evaluate(img => img.naturalWidth > 0), true);
+    assert.deepEqual(await page.locator('.store-nav > a > span:first-of-type').allTextContents(), ['Dashboard', 'Produk', 'Notifikasi', 'Pesanan', 'Keranjang', 'Akun']);
+    assert.equal(await page.locator('.store-nav [aria-current=page]').innerText(), 'Dashboard');
+    await page.evaluate(() => window.scrollTo(0, 700));
+    await page.waitForTimeout(500);
+    assert.equal(await page.locator('.store-header').evaluate(el => Math.round(el.getBoundingClientRect().top)), 0);
+    assert.equal(await page.locator('.store-header').evaluate(el => el.classList.contains('is-scrolled')), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: path.resolve(__dirname, `../screenshots/header-${width}.png`) });
+    await page.getByRole('navigation', { name: 'Navigasi toko' }).getByRole('link', { name: 'Notifikasi' }).click();
+    await page.waitForURL('**/notifikasi.php');
+    await page.waitForTimeout(700);
+    assert.equal(await page.locator('.notification-card').count(), 6);
+    assert.equal(await page.locator('.notification-list').innerText().then(text => text.includes('#TM-7')), false);
+    assert.equal(await page.locator('.store-nav [aria-current=page]').innerText(), 'Notifikasi');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: path.resolve(__dirname, `../screenshots/notifications-${width}.png`) });
+    assert.deepEqual(errors, []);
+    console.log('PASS brand, sticky header, navigation, notification ownership, responsive layout:', width);
+    await context.close();
+  }
+  const reduced = await browser.newContext({ reducedMotion: 'reduce' });
+  const page = await reduced.newPage();
+  await page.goto('http://127.0.0.1:8765/', { waitUntil: 'networkidle' });
+  assert.equal(await page.locator('.hero-visual > img').evaluate(el => getComputedStyle(el).animationName), 'none');
+  assert.equal(await page.locator('.product-card').first().evaluate(el => getComputedStyle(el).opacity), '1');
+  await page.goto('http://127.0.0.1:8765/pages/notifikasi.php');
+  assert.match(page.url(), /pages\/login\.php$/);
+  console.log('PASS reduced motion and guest notification access');
+  await browser.close();
+})().catch(error => { console.error(error); process.exitCode = 1; });

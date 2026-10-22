@@ -1,0 +1,4 @@
+Options -Indexes
+<FilesMatch "(\.sql$|^error_log$)">
+    Require all denied
+</FilesMatch>
